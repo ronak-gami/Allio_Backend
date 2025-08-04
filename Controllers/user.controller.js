@@ -1,7 +1,7 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
-import db from '../firebase.js';
+import db from '../Config/firebaseConfig.js';
 import nodemailer from 'nodemailer';
 import ejs from 'ejs';
 import path from 'path';
