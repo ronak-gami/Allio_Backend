@@ -1,12 +1,14 @@
 import express from 'express';
 import multer from 'multer';
-import {getUserMedia, uploadFile} from '../Controllers/upload.controller.js';
+import {uploadFile, getUserMedia} from '../Controllers/upload.controller.js';
 
-const uploadRouter = express.Router();
+const router = express.Router();
+const upload = multer();
 
-const upload = multer({storage: multer.memoryStorage()});
+// Upload route → handles multipart/form-data
+router.post('/upload', upload.single('file'), uploadFile);
 
-uploadRouter.post('/upload', upload.single('file'), uploadFile);
-uploadRouter.post('/get-media', getUserMedia);
+// Get media route → handles JSON
+router.post('/get-media', express.json(), getUserMedia);
 
-export default uploadRouter;
+export default router;

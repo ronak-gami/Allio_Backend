@@ -2,13 +2,17 @@ import express from 'express';
 import dotenv from 'dotenv';
 import userRouter from './Routes/user.route.js';
 import uploadRouter from './Routes/upload.route.js';
+import cors from 'cors';
 
 dotenv.config();
 const app = express();
 
-app.use(express.json());
+app.use(cors());
 
-app.use('/api/user', userRouter);
+// Apply JSON parsing for non-file routes
+app.use('/api/user', express.json(), userRouter);
+
+// Do NOT use express.json() for file upload route
 app.use('/api', uploadRouter);
 
 const PORT = process.env.PORT || 3000;

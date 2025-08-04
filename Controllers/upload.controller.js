@@ -8,9 +8,28 @@ const uploadFile = async (req, res) => {
     const file = req.file;
 
     if (!file || !fileType || !email) {
-      return res
-        .status(400)
-        .json({success: false, error: 'email, file and fileType are required'});
+      return res.status(400).json({
+        success: false,
+        error: 'email, file and fileType are required',
+      });
+    }
+
+    // ✅ Validate file size
+    const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5 MB
+    const MAX_VIDEO_SIZE = 50 * 1024 * 1024; // 50 MB
+
+    if (fileType === 'image' && file.size > MAX_IMAGE_SIZE) {
+      return res.status(400).json({
+        success: false,
+        error: `Image size exceeds 5MB limit.`,
+      });
+    }
+
+    if (fileType === 'video' && file.size > MAX_VIDEO_SIZE) {
+      return res.status(400).json({
+        success: false,
+        error: `Video size exceeds 50MB limit.`,
+      });
     }
 
     const resourceType = fileType === 'video' ? 'video' : 'image';
@@ -100,9 +119,10 @@ const getUserMedia = async (req, res) => {
     } else if (fileType === 'video') {
       files = userData.videos || [];
     } else {
-      return res
-        .status(400)
-        .json({success: false, error: 'Invalid fileType. Use image or video'});
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid fileType. Use image or video',
+      });
     }
 
     return res.json({
