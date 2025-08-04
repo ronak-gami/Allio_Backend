@@ -14,22 +14,19 @@ const uploadFile = async (req, res) => {
       });
     }
 
-    // ✅ Validate file size
-    const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5 MB
-    const MAX_VIDEO_SIZE = 50 * 1024 * 1024; // 50 MB
+    const MAX_IMAGE_SIZE = 50 * 1024 * 1024;
+    const MAX_VIDEO_SIZE = 50 * 1024 * 1024;
 
     if (fileType === 'image' && file.size > MAX_IMAGE_SIZE) {
-      return res.status(400).json({
-        success: false,
-        error: `Image size exceeds 5MB limit.`,
-      });
+      return res
+        .status(400)
+        .json({success: false, error: `Image size exceeds 50MB limit.`});
     }
 
     if (fileType === 'video' && file.size > MAX_VIDEO_SIZE) {
-      return res.status(400).json({
-        success: false,
-        error: `Video size exceeds 50MB limit.`,
-      });
+      return res
+        .status(400)
+        .json({success: false, error: `Video size exceeds 50MB limit.`});
     }
 
     const resourceType = fileType === 'video' ? 'video' : 'image';
@@ -46,6 +43,22 @@ const uploadFile = async (req, res) => {
         }
 
         try {
+          let videoData = null;
+
+          if (fileType === 'video') {
+            // Generate thumbnail using Cloudinary transformations
+            const thumbnailUrl =
+              result.secure_url.replace(
+                '/upload/',
+                '/upload/w_300,h_200,c_fill/',
+              ) + '.jpg'; // Extracts first frame
+
+            videoData = {
+              videoURL: result.secure_url,
+              thumbnail: thumbnailUrl,
+            };
+          }
+
           const userDocRef = db.collection('media').doc(email);
           const userDoc = await userDocRef.get();
 
@@ -59,7 +72,7 @@ const uploadFile = async (req, res) => {
                   : userData.images || [],
               videos:
                 fileType === 'video'
-                  ? [...(userData.videos || []), result.secure_url]
+                  ? [...(userData.videos || []), videoData]
                   : userData.videos || [],
             };
             await userDocRef.set(updatedData);
@@ -67,14 +80,13 @@ const uploadFile = async (req, res) => {
             await userDocRef.set({
               email,
               images: fileType === 'image' ? [result.secure_url] : [],
-              videos: fileType === 'video' ? [result.secure_url] : [],
+              videos: fileType === 'video' ? [videoData] : [],
             });
           }
 
           res.json({
             success: true,
             message: 'File uploaded successfully',
-            url: result.secure_url,
           });
         } catch (dbError) {
           console.error(dbError);
@@ -95,6 +107,7 @@ const uploadFile = async (req, res) => {
 const getUserMedia = async (req, res) => {
   try {
     const {email, fileType} = req.body;
+    console.log('req.body (getUserMedia):', req.body);
 
     if (!email || !fileType) {
       return res
