@@ -7,6 +7,7 @@ const uploadFile = async (req, res) => {
     const {email, fileType} = req.body;
     const file = req.file;
 
+    // Validate request
     if (!file || !fileType || !email) {
       return res.status(400).json({
         success: false,
@@ -14,23 +15,27 @@ const uploadFile = async (req, res) => {
       });
     }
 
-    const MAX_IMAGE_SIZE = 50 * 1024 * 1024;
-    const MAX_VIDEO_SIZE = 50 * 1024 * 1024;
+    // File size limits
+    const MAX_IMAGE_SIZE = 50 * 1024 * 1024; // 50MB
+    const MAX_VIDEO_SIZE = 10 * 1024 * 1024; // 10MB
 
     if (fileType === 'image' && file.size > MAX_IMAGE_SIZE) {
-      return res
-        .status(400)
-        .json({success: false, error: `Image size exceeds 50MB limit.`});
+      return res.status(400).json({
+        success: false,
+        error: `Image size exceeds 50MB limit.`,
+      });
     }
 
     if (fileType === 'video' && file.size > MAX_VIDEO_SIZE) {
-      return res
-        .status(400)
-        .json({success: false, error: `Video size exceeds 50MB limit.`});
+      return res.status(400).json({
+        success: false,
+        error: `Video size exceeds 10MB limit.`,
+      });
     }
 
     const resourceType = fileType === 'video' ? 'video' : 'image';
 
+    // Upload to Cloudinary
     const uploadStream = cloudinary.uploader.upload_stream(
       {
         resource_type: resourceType,
@@ -39,19 +44,18 @@ const uploadFile = async (req, res) => {
       },
       async (error, result) => {
         if (error) {
-          return res.status(500).json({success: false, error: error.message});
+          return res.status(400).json({success: false, error: error.message});
         }
 
         try {
+          // Prepare video data for DB if needed
           let videoData = null;
-
           if (fileType === 'video') {
-            // Generate thumbnail using Cloudinary transformations
-            const thumbnailUrl =
-              result.secure_url.replace(
-                '/upload/',
-                '/upload/w_300,h_200,c_fill/',
-              ) + '.jpg'; // Extracts first frame
+            const videoPublicId = result.public_id;
+            const videoVersion = result.version;
+            const cloudName = result.secure_url.split('/')[3];
+
+            const thumbnailUrl = `https://res.cloudinary.com/${cloudName}/video/upload/w_200,h_200,c_fill,so_2/v${videoVersion}/${videoPublicId}.jpg`;
 
             videoData = {
               videoURL: result.secure_url,
@@ -59,6 +63,7 @@ const uploadFile = async (req, res) => {
             };
           }
 
+          // Save in Firestore
           const userDocRef = db.collection('media').doc(email);
           const userDoc = await userDocRef.get();
 
@@ -84,7 +89,7 @@ const uploadFile = async (req, res) => {
             });
           }
 
-          res.json({
+          return res.json({
             success: true,
             message: 'File uploaded successfully',
           });
