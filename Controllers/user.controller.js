@@ -1,3 +1,4 @@
+import admin from 'firebase-admin';
 import dotenv from 'dotenv';
 dotenv.config();
 
@@ -175,4 +176,114 @@ const setNewMpin = async (req, res) => {
   }
 };
 
-export {sendOtp, validateOtp, setNewMpin};
+const sendNotification = async (req, res) => {
+  try {
+    const {emails, title, body} = req.body;
+
+    // Validate required fields
+    if (!emails || !Array.isArray(emails) || !title || !body) {
+      return res.status(400).json({
+        status: false,
+        message: 'Emails array, title and body are required fields',
+      });
+    }
+
+    // Arrays to store successful and failed notifications
+    const successfulNotifications = [];
+    const failedNotifications = [];
+
+    // Process each email
+    for (const email of emails) {
+      try {
+        // Fetch user by email to get FCM token
+        const snapshot = await db
+          .collection('users')
+          .where('email', '==', email)
+          .get();
+
+        if (snapshot.empty) {
+          failedNotifications.push({
+            email,
+            reason: 'User not found',
+          });
+          continue;
+        }
+
+        const userData = snapshot.docs[0].data();
+
+        // If FCM token doesn't exist, add to successful with "User isn't logged in" message
+        if (!userData.fcmToken) {
+          successfulNotifications.push({
+            email,
+            message: "User isn't logged in",
+          });
+          continue;
+        }
+
+        // Prepare notification message
+        const message = {
+          notification: {
+            title,
+            body,
+          },
+          token: userData.fcmToken,
+          android: {
+            notification: {
+              clickAction: 'FLUTTER_NOTIFICATION_CLICK',
+              priority: 'high',
+            },
+          },
+          apns: {
+            payload: {
+              aps: {
+                'mutable-content': 1,
+                sound: 'default',
+              },
+            },
+          },
+        };
+
+        // Send notification
+        const response = await admin.messaging().send(message);
+        successfulNotifications.push({
+          email,
+          messageId: response,
+        });
+      } catch (error) {
+        // Only handle critical errors
+        failedNotifications.push({
+          email,
+          reason: 'Failed to process notification',
+        });
+      }
+    }
+
+    // Always return success true with summary
+    return res.json({
+      status: true,
+      summary: {
+        total: emails.length,
+        successful: successfulNotifications.length,
+        failed: failedNotifications.length,
+      },
+      successfulNotifications,
+      failedNotifications:
+        failedNotifications.length > 0 ? failedNotifications : undefined,
+    });
+  } catch (error) {
+    console.error('Send Notification Error:', error);
+    // Even in case of error, return success true to avoid frontend axios errors
+    return res.json({
+      status: true,
+      message: 'Notification process completed',
+      summary: {
+        total: emails.length,
+        successful: 0,
+        failed: emails.length,
+      },
+      successfulNotifications: [],
+    });
+  }
+};
+
+export {sendOtp, validateOtp, setNewMpin, sendNotification};
