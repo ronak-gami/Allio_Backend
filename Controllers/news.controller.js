@@ -16,7 +16,6 @@ const upload = multer({
 // Create News
 const createNews = async (req, res) => {
   try {
-    // Use multer to handle file upload
     upload(req, res, async (err) => {
       if (err) {
         return res.status(400).json({
@@ -27,7 +26,6 @@ const createNews = async (req, res) => {
 
       const { name, description } = req.body;
 
-      // Validate required fields
       if (!name || !description) {
         return res.status(400).json({
           status: false,
@@ -35,7 +33,6 @@ const createNews = async (req, res) => {
         });
       }
 
-      // Check if image is provided
       if (!req.file) {
         return res.status(400).json({
           status: false,
@@ -69,7 +66,6 @@ const createNews = async (req, res) => {
       const newsRef = db.collection("news").doc();
       const newsData = {
         id: newsId, // ✅ unique UUID for external use
-        firestoreId: newsRef.id, // optional: keep Firestore doc.id if needed
         name,
         description,
         imageUrl: uploadResult.secure_url,
@@ -150,41 +146,77 @@ const deleteNews = async (req, res) => {
 // Edit (Update) News by UUID
 const editNews = async (req, res) => {
   try {
-    const { id } = req.params;
-    const { name, description } = req.body;
+    upload(req, res, async (err) => {
+      if (err) {
+        return res.status(400).json({
+          status: false,
+          message: err.message || "File upload error",
+        });
+      }
 
-    if (!id) {
-      return res
-        .status(400)
-        .json({ status: false, message: "News ID is required" });
-    }
+      const { id } = req.params;
+      const { name, description } = req.body;
 
-    // Find the document with matching UUID
-    const snapshot = await db.collection("news").where("id", "==", id).get();
+      if (!id) {
+        return res
+          .status(400)
+          .json({ status: false, message: "News ID is required" });
+      }
 
-    if (snapshot.empty) {
-      return res.status(404).json({ status: false, message: "News not found" });
-    }
+      // Find the document with matching UUID
+      const snapshot = await db.collection("news").where("id", "==", id).get();
 
-    const docRef = snapshot.docs[0].ref;
+      if (snapshot.empty) {
+        return res
+          .status(404)
+          .json({ status: false, message: "News not found" });
+      }
 
-    const updatedData = {};
-    if (name) updatedData.name = name;
-    if (description) updatedData.description = description;
-    updatedData.updatedAt = new Date();
+      const docRef = snapshot.docs[0].ref;
+      const updatedData = {};
 
-    await docRef.update(updatedData);
+      if (name) updatedData.name = name;
+      if (description) updatedData.description = description;
 
-    return res.json({
-      status: true,
-      message: "News updated successfully",
-      data: { id, ...updatedData },
+      // If new image is uploaded
+      if (req.file) {
+        const uploadPromise = new Promise((resolve, reject) => {
+          const uploadStream = cloudinary.uploader.upload_stream(
+            {
+              folder: "news",
+              public_id: uuidv4(),
+            },
+            (error, result) => {
+              if (error) reject(error);
+              else resolve(result);
+            }
+          );
+
+          const bufferStream = Readable.from(req.file.buffer);
+          bufferStream.pipe(uploadStream);
+        });
+
+        const uploadResult = await uploadPromise;
+        updatedData.imageUrl = uploadResult.secure_url;
+      }
+
+      updatedData.updatedAt = new Date();
+
+      await docRef.update(updatedData);
+
+      return res.json({
+        status: true,
+        message: "News updated successfully",
+        data: { id, ...updatedData },
+      });
     });
   } catch (error) {
     console.error("Edit News Error:", error);
-    return res
-      .status(500)
-      .json({ status: false, message: "Failed to update news" });
+    return res.status(500).json({
+      status: false,
+      message: "Failed to update news",
+      error: error.message,
+    });
   }
 };
 
