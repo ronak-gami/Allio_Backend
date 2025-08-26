@@ -112,7 +112,6 @@ const uploadFile = async (req, res) => {
 const getUserMedia = async (req, res) => {
   try {
     const {email, fileType} = req.body;
-    console.log('req.body (getUserMedia):', req.body);
 
     if (!email || !fileType) {
       return res
