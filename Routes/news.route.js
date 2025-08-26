@@ -3,7 +3,7 @@ import {createNews, getAllNews} from '../Controllers/news.controller.js';
 
 const newsRouter = express.Router();
 
-newsRouter.post('/create', createNews);
-newsRouter.get('/get-all', getAllNews);
+newsRouter.post('/', createNews);
+newsRouter.get('/', getAllNews);
 
 export default newsRouter;
