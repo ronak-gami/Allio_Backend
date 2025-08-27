@@ -220,25 +220,29 @@ const sendNotification = async (req, res) => {
           continue;
         }
 
-        // Prepare notification message
+        // Send DATA-ONLY message to avoid duplicates
         const message = {
-          notification: {
-            title,
-            body,
+          // Only data payload - no notification payload
+          data: {
+            title: title.toString(),
+            body: body.toString(),
           },
           token: userData.fcmToken,
           android: {
-            notification: {
-              clickAction: 'FLUTTER_NOTIFICATION_CLICK',
-              priority: 'high',
-            },
+            priority: 'high',
+            ttl: 3600,
           },
           apns: {
+            headers: {
+              'apns-priority': '10',
+            },
             payload: {
               aps: {
-                'mutable-content': 1,
-                sound: 'default',
+                'content-available': 1, // Silent notification for iOS
               },
+              // Custom data
+              title: title.toString(),
+              body: body.toString(),
             },
           },
         };
@@ -250,7 +254,7 @@ const sendNotification = async (req, res) => {
           messageId: response,
         });
       } catch (error) {
-        // Only handle critical errors
+        console.error(`Error sending notification to ${email}:`, error);
         failedNotifications.push({
           email,
           reason: 'Failed to process notification',
@@ -261,6 +265,7 @@ const sendNotification = async (req, res) => {
     // Always return success true with summary
     return res.json({
       status: true,
+      message: 'Notifications sent successfully',
       summary: {
         total: emails.length,
         successful: successfulNotifications.length,
@@ -272,14 +277,13 @@ const sendNotification = async (req, res) => {
     });
   } catch (error) {
     console.error('Send Notification Error:', error);
-    // Even in case of error, return success true to avoid frontend axios errors
     return res.json({
       status: true,
       message: 'Notification process completed',
       summary: {
-        total: emails.length,
+        total: emails?.length || 0,
         successful: 0,
-        failed: emails.length,
+        failed: emails?.length || 0,
       },
       successfulNotifications: [],
     });
