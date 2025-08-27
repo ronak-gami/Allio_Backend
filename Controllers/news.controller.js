@@ -33,31 +33,32 @@ const createNews = async (req, res) => {
         });
       }
 
-      if (!req.file) {
-        return res.status(400).json({
-          status: false,
-          message: "Image is required",
-        });
-      }
+      // 🔽 Commented image validation
+      // if (!req.file) {
+      //   return res.status(400).json({
+      //     status: false,
+      //     message: "Image is required",
+      //   });
+      // }
 
-      // Upload image to Cloudinary
-      const uploadPromise = new Promise((resolve, reject) => {
-        const uploadStream = cloudinary.uploader.upload_stream(
-          {
-            folder: "news",
-            public_id: uuidv4(),
-          },
-          (error, result) => {
-            if (error) reject(error);
-            else resolve(result);
-          }
-        );
+      // 🔽 Commented Cloudinary upload
+      // const uploadPromise = new Promise((resolve, reject) => {
+      //   const uploadStream = cloudinary.uploader.upload_stream(
+      //     {
+      //       folder: "news",
+      //       public_id: uuidv4(),
+      //     },
+      //     (error, result) => {
+      //       if (error) reject(error);
+      //       else resolve(result);
+      //     }
+      //   );
 
-        const bufferStream = Readable.from(req.file.buffer);
-        bufferStream.pipe(uploadStream);
-      });
+      //   const bufferStream = Readable.from(req.file.buffer);
+      //   bufferStream.pipe(uploadStream);
+      // });
 
-      const uploadResult = await uploadPromise;
+      // const uploadResult = await uploadPromise;
 
       // Generate UUID for news item
       const newsId = uuidv4();
@@ -65,10 +66,10 @@ const createNews = async (req, res) => {
       // Create news document in Firebase
       const newsRef = db.collection("news").doc();
       const newsData = {
-        id: newsId, // ✅ unique UUID for external use
+        id: newsId,
         name,
         description,
-        imageUrl: uploadResult.secure_url,
+        // imageUrl: uploadResult.secure_url, // 🔽 Commented
         createdAt: new Date(),
       };
 
@@ -124,7 +125,6 @@ const deleteNews = async (req, res) => {
         .json({ status: false, message: "News ID is required" });
     }
 
-    // Find the document with matching UUID
     const snapshot = await db.collection("news").where("id", "==", id).get();
 
     if (snapshot.empty) {
@@ -163,7 +163,6 @@ const editNews = async (req, res) => {
           .json({ status: false, message: "News ID is required" });
       }
 
-      // Find the document with matching UUID
       const snapshot = await db.collection("news").where("id", "==", id).get();
 
       if (snapshot.empty) {
@@ -178,27 +177,27 @@ const editNews = async (req, res) => {
       if (name) updatedData.name = name;
       if (description) updatedData.description = description;
 
-      // If new image is uploaded
-      if (req.file) {
-        const uploadPromise = new Promise((resolve, reject) => {
-          const uploadStream = cloudinary.uploader.upload_stream(
-            {
-              folder: "news",
-              public_id: uuidv4(),
-            },
-            (error, result) => {
-              if (error) reject(error);
-              else resolve(result);
-            }
-          );
+      // 🔽 Commented Cloudinary re-upload
+      // if (req.file) {
+      //   const uploadPromise = new Promise((resolve, reject) => {
+      //     const uploadStream = cloudinary.uploader.upload_stream(
+      //       {
+      //         folder: "news",
+      //         public_id: uuidv4(),
+      //       },
+      //       (error, result) => {
+      //         if (error) reject(error);
+      //         else resolve(result);
+      //       }
+      //     );
 
-          const bufferStream = Readable.from(req.file.buffer);
-          bufferStream.pipe(uploadStream);
-        });
+      //     const bufferStream = Readable.from(req.file.buffer);
+      //     bufferStream.pipe(uploadStream);
+      //   });
 
-        const uploadResult = await uploadPromise;
-        updatedData.imageUrl = uploadResult.secure_url;
-      }
+      //   const uploadResult = await uploadPromise;
+      //   updatedData.imageUrl = uploadResult.secure_url;
+      // }
 
       updatedData.updatedAt = new Date();
 
