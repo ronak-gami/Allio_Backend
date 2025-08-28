@@ -41,8 +41,6 @@ const generateQRCode = async (req, res) => {
       });
     }
 
-    console.log(firstName, 'firstname from Firestore');
-
     // 🔹 Step 2: Generate QR code as Data URL
     const qrDataUrl = await QRCode.toDataURL(email, {
       margin: 1,
