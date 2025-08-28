@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.allio",
+      "sha256_cert_fingerprints": [
+        "18:9F:F6:BB:80:FC:4C:55:A8:1B:36:BD:FE:DC:80:C0:34:C0:C1:F9:98:D4:33:D9:A5:76:92:74:82:09:67:CA"
+      ]
+    }
+  }
+]

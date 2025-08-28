@@ -177,113 +177,101 @@ const setNewMpin = async (req, res) => {
 };
 
 const sendNotification = async (req, res) => {
-  try {
-    const {emails, title, body} = req.body;
+  const {emails, title, body} = req.body; // DO NOT CHANGE (as requested)
 
-    // Validate required fields
-    if (!emails || !Array.isArray(emails) || !title || !body) {
+  try {
+    // Basic validation (does not alter destructure)
+    if (!Array.isArray(emails) || emails.length === 0 || !title || !body) {
       return res.status(400).json({
         status: false,
-        message: 'Emails array, title and body are required fields',
+        message: 'Invalid payload: emails (array), title, body required',
       });
     }
 
-    // Arrays to store successful and failed notifications
     const successfulNotifications = [];
     const failedNotifications = [];
 
-    // Process each email
-    for (const email of emails) {
+    for (const rawEmail of emails) {
+      const email = (rawEmail || '').trim().toLowerCase();
+      if (!email) {
+        failedNotifications.push({email: rawEmail, reason: 'Empty email'});
+        continue;
+      }
+
       try {
-        // Fetch user by email to get FCM token
         const snapshot = await db
           .collection('users')
           .where('email', '==', email)
+          .limit(1)
           .get();
 
         if (snapshot.empty) {
-          failedNotifications.push({
-            email,
-            reason: 'User not found',
-          });
+          failedNotifications.push({email, reason: 'User not found'});
           continue;
         }
 
         const userData = snapshot.docs[0].data();
+        const fcmToken = userData.fcmToken;
 
-        // If FCM token doesn't exist, add to successful with "User isn't logged in" message
-        if (!userData.fcmToken) {
+        if (!fcmToken) {
           successfulNotifications.push({
             email,
-            message: "User isn't logged in",
+            message: "User isn't logged in (no fcmToken)",
           });
           continue;
         }
 
-        // Send DATA-ONLY message to avoid duplicates
         const message = {
-          // Only data payload - no notification payload
+          token: fcmToken,
           data: {
-            title: title.toString(),
-            body: body.toString(),
+            title: String(title),
+            body: String(body),
+            // (Add more custom keys here later if needed)
           },
-          token: userData.fcmToken,
           android: {
             priority: 'high',
-            ttl: 3600,
+            ttl: 3600 * 1000, // 1h ms
           },
           apns: {
-            headers: {
-              'apns-priority': '10',
-            },
+            headers: {'apns-priority': '10'},
             payload: {
               aps: {
-                'content-available': 1, // Silent notification for iOS
+                'content-available': 1,
               },
-              // Custom data
-              title: title.toString(),
-              body: body.toString(),
             },
           },
         };
 
-        // Send notification
-        const response = await admin.messaging().send(message);
-        successfulNotifications.push({
-          email,
-          messageId: response,
-        });
-      } catch (error) {
-        console.error(`Error sending notification to ${email}:`, error);
-        failedNotifications.push({
-          email,
-          reason: 'Failed to process notification',
-        });
+        const responseId = await admin.messaging().send(message);
+        successfulNotifications.push({email, messageId: responseId});
+      } catch (err) {
+        console.error('FCM send error for', email, err);
+        failedNotifications.push({email, reason: 'Send failed'});
       }
     }
 
-    // Always return success true with summary
-    return res.json({
+    return res.status(200).json({
       status: true,
-      message: 'Notifications sent successfully',
+      message: 'Notification processing complete',
       summary: {
         total: emails.length,
         successful: successfulNotifications.length,
         failed: failedNotifications.length,
       },
       successfulNotifications,
-      failedNotifications:
-        failedNotifications.length > 0 ? failedNotifications : undefined,
+      failedNotifications: failedNotifications.length
+        ? failedNotifications
+        : undefined,
     });
   } catch (error) {
-    console.error('Send Notification Error:', error);
-    return res.json({
+    console.error('Send Notification Fatal Error:', error);
+    return res.status(500).json({
       status: true,
-      message: 'Notification process completed',
+      message: 'Notification process completed with fatal error',
       summary: {
-        total: emails?.length || 0,
+        total: Array.isArray(emails) ? emails.length : 0,
         successful: 0,
-        failed: emails?.length || 0,
+        failed: Array.isArray(emails) ? emails.length : 0,
       },
       successfulNotifications: [],
     });
