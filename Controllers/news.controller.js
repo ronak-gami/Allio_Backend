@@ -4,7 +4,7 @@ import {v4 as uuidv4} from 'uuid';
 // Create News
 const createNews = async (req, res) => {
   try {
-    const {name, description} = req.body;
+    const {name, description, createdAt} = req.body;
 
     if (!name || !description) {
       return res.status(400).json({
@@ -13,16 +13,17 @@ const createNews = async (req, res) => {
       });
     }
 
-    // Generate UUID for news item
     const newsId = uuidv4();
+    const createdAtValue = createdAt
+      ? new Date(createdAt).toISOString()
+      : new Date().toISOString();
 
-    // Create news document in Firebase
     const newsRef = db.collection('news').doc();
     const newsData = {
       id: newsId,
       name,
       description,
-      createdAt: new Date(),
+      createdAt: createdAtValue,
     };
 
     await newsRef.set(newsData);
@@ -107,7 +108,7 @@ const deleteNews = async (req, res) => {
 const editNews = async (req, res) => {
   try {
     const {id} = req.params;
-    const {name, description} = req.body;
+    const {name, description, createdAt} = req.body; // createdAt may be sent to REPLACE existing
 
     if (!id) {
       return res.status(400).json({
@@ -116,8 +117,11 @@ const editNews = async (req, res) => {
       });
     }
 
-    const snapshot = await db.collection('news').where('id', '==', id).get();
-
+    const snapshot = await db
+      .collection('news')
+      .where('id', '==', id)
+      .limit(1)
+      .get();
     if (snapshot.empty) {
       return res.status(404).json({
         status: false,
@@ -126,11 +130,31 @@ const editNews = async (req, res) => {
     }
 
     const docRef = snapshot.docs[0].ref;
-    const updatedData = {};
 
+    const updatedData = {};
     if (name) updatedData.name = name;
     if (description) updatedData.description = description;
-    updatedData.updatedAt = new Date();
+
+    if (createdAt !== undefined) {
+      const parsed = new Date(createdAt);
+      if (isNaN(parsed.getTime())) {
+        return res.status(400).json({
+          status: false,
+          message: 'Invalid createdAt value (must be ISO date string)',
+        });
+      }
+      updatedData.createdAt = parsed.toISOString();
+    }
+
+    updatedData.updatedAt = new Date().toISOString();
+
+    if (Object.keys(updatedData).length === 1) {
+      // only updatedAt present
+      return res.status(400).json({
+        status: false,
+        message: 'Nothing to update',
+      });
+    }
 
     await docRef.update(updatedData);
 
